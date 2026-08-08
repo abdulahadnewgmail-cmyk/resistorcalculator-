@@ -1,0 +1,15 @@
+{
+  "name": "RCC & SMD Calculator",
+  "short_name": "ResistorCalc",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f5f5f7",
+  "theme_color": "#ff6b00",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

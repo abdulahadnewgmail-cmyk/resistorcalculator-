@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="manifest" href="manifest.json">
+  <title>RCC / SMD Calculator</title>
+  <style>
+    /* ===================== BASE ===================== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #f5f5f7;
+      color: #1d1d1f;
+    }
+
+    /* ===================== TOP BAR ===================== */
+    .top-bar {
+      position: sticky;
+      top: 0;
+      display: flex;
+      justify-content: space-around;
+      padding: 14px 16px;
+      background: #1e1e22;
+      border-bottom: 2px solid #333;
+      z-index: 100;
+    }
+    .tab {
+      width: 30%;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 10px 32px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: #2c2c31;
+      color: #aaa;
+      transition: all 0.2s ease;
+    }
+
+    .top-bar .tab:hover {
+      color: #fff;
+      background: #3a3a40;
+    }
+
+    .top-bar .tab.active {
+      background: #ff6b00;
+      color: #fff;
+    }
+
+    /* ===================== PAGES ===================== */
+    .page {
+      display: none;
+      padding: 24px 16px;
+      min-height: calc(100vh - 60px);
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    /* ===================== SHARED CALCULATOR LAYOUT ===================== */
+    .calc-container {
+      width: 100%;
+      max-width: 650px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    /* --- Band count selector (3 / 4 / 5) --- */
+    .band-selector, .smd-selector {
+      display: flex;
+      gap: 8px;
+      background: #e8e8ec;
+      padding: 6px;
+      border-radius: 12px;
+    }
+
+    .band-option, .smd-option {
+      border: none;
+      padding: 10px 24px;
+      font-size: 15px;
+      font-weight: 700;
+      border-radius: 9px;
+      cursor: pointer;
+      background: transparent;
+      color: #555;
+      transition: all 0.2s ease;
+    }
+
+    .band-option:hover, .smd-option:hover {
+      color: #1d1d1f;
+    }
+
+    .band-option.active, .smd-option.active {
+      background: #ff6b00;
+      color: #fff;
+    }
+
+    /* --- Resistor visual container --- */
+    .resistor-display {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+      width: 100%;
+    }
+
+    .resistor {
+      display: flex;
+      align-items: center;
+      filter: drop-shadow(0 8px 12px rgba(0,0,0,0.1));
+    }
+
+    .lead {
+      width: 45px;
+      height: 12px;
+      background: linear-gradient(to bottom, #d5d5de 0%, #ffffff 30%, #8a8a97 100%);
+      position: relative;
+      z-index: 0;
+    }
+
+    .lead:first-child {
+      border-radius: 6px 0 0 6px;
+      margin-right: -4px;
+    }
+
+    .lead:last-child {
+      border-radius: 0 6px 6px 0;
+      margin-left: -4px;
+    }
+
+    .resistor-body {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-evenly;
+      width: 300px;
+      height: 82px;
+      background: linear-gradient(to bottom, #f2dec0 0%, #dcc69e 30%, #c1a97d 70%, #9a7642 100%);
+      border-radius: 34px;
+      padding: 0 10px;
+      overflow: hidden;
+      z-index: 1;
+      box-shadow: inset 0 -6px 12px rgba(0,0,0,0.15), inset 0 6px 12px rgba(255,255,255,0.4);
+    }
+
+    .resistor-body::before,
+    .resistor-body::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 210px;
+      height: 26px;
+      background: #ffffff; 
+      border-radius: 50%;
+      z-index: 10;
+    }
+
+    .resistor-body::before {
+      top: -17px;
+      box-shadow: 0 6px 6px rgba(0,0,0,0.08);
+    }
+
+    .resistor-body::after {
+      bottom: -17px;
+      box-shadow: 0 -6px 6px rgba(0,0,0,0.08);
+    }
+
+    .r-band {
+      height: 100%;
+      width: 16px;
+      border-radius: 2px;
+      z-index: 2;
+      box-shadow: inset 3px 0 5px rgba(255,255,255,0.3), inset -3px 0 5px rgba(0,0,0,0.3);
+    }
+
+    /* --- Measured value readout --- */
+    .readout {
+      font-size: 26px;
+      font-weight: 800;
+      background: #f9f9fb;
+      border: 2px solid #eaeaea;
+      border-radius: 12px;
+      padding: 10px 24px;
+      min-width: 200px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+      letter-spacing: 0.5px;
+    }
+
+    /* --- Merged & Responsive Input Containers (RCC & SMD) --- */
+    .band-columns, .smd-columns {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: stretch;
+      gap: 12px;
+      width: 100%;
+      background: #ffffff;
+      padding: 20px;
+      border-radius: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    }
+
+    .col {
+      background: #fcfcfd;
+      border: none;
+      border-radius: 12px;
+      padding: 5px;
+      flex: 1;
+      min-width: 110px;
+      max-width: 140px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .col-head {
+      text-align: center;
+      font-weight: 800;
+      font-size: 13px;
+      color: #333;
+      margin-bottom: 10px;
+      white-space: nowrap;
+    }
+
+    .col-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .color-btn, .smd-btn {
+      border: 2px solid transparent;
+      border-radius: 6px;
+      padding: 8px 6px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.1s ease, box-shadow 0.15s ease;
+    }
+
+    .color-btn:hover, .smd-btn:hover {
+      transform: scale(1.03);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+
+    .color-btn.selected, .smd-btn.selected {
+      border-color: #ff6b00;
+      box-shadow: 0 0 0 2px #ff6b00, 0 4px 10px rgba(0,0,0,0.15);
+      transform: scale(1.04);
+    }
+
+    /* --- SMD Realistic Chip Visual --- */
+    .smd-chip-body {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 120px;
+      height: 60px;
+      background: #2b2b2f; /* Dark ceramic body */
+      border-radius: 10px;
+      box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 4px 10px rgba(0,0,0,0.2);
+      border: 1px solid #444;
+    }
+
+    /* Metallic solder pads on edges */
+    .smd-chip-body::before,
+    .smd-chip-body::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 16px;
+      background: linear-gradient(to right, #cfcfd1, #f2f2f5, #9c9c9e);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+    }
+    .smd-chip-body::before { left: 0; border-radius: 9px 0 0 9px; }
+    .smd-chip-body::after { right: 0; border-radius: 0 9px 9px 0; }
+
+    .smd-chip-text {
+      font-family: monospace;
+      font-size: 26px;
+      font-weight: 800;
+      color: #e0e0e0;
+      letter-spacing: 2px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.9);
+      z-index: 2;
+    }
+
+    /* Responsive queries */
+    @media (max-width: 480px) {
+      .col {
+        min-width: 90px;
+        padding: 8px;
+      }
+      .resistor-body {
+        width: 260px;
+      }
+      .smd-chip-body {
+        width: 150px;
+        height: 75px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== TOP BAR NAVIGATION ==================== -->
+  <nav class="top-bar">
+    <button class="tab active" data-page="rcc">RCC</button>
+    <button class="tab" data-page="smd">SMD</button>
+  </nav>
+
+  <!-- ==================== PAGE 1: RCC — RESISTOR CALCULATOR ==================== -->
+  <main id="rcc" class="page active">
+    <div class="calc-container">
+      <div class="band-selector">
+        <button class="band-option active" data-bands="3">3 Bands</button>
+        <button class="band-option" data-bands="4">4 Bands</button>
+        <button class="band-option" data-bands="5">5 Bands</button>
+      </div>
+
+      <div class="resistor-display">
+        <div class="resistor">
+          <div class="lead"></div>
+          <div class="resistor-body">
+            <div class="r-band" data-band="0"></div>
+            <div class="r-band" data-band="1"></div>
+            <div class="r-band" data-band="2"></div>
+            <div class="r-band" data-band="3"></div>
+            <div class="r-band" data-band="4"></div>
+          </div>
+          <div class="lead"></div>
+        </div>
+        <div class="readout" id="rccReadout"></div>
+      </div>
+
+      <div class="band-columns" id="bandColumns"></div>
+    </div>
+  </main>
+
+  <!-- ==================== PAGE 2: SMD CALCULATOR ==================== -->
+  <main id="smd" class="page">
+    <div class="calc-container">
+      <div class="smd-selector">
+        <button class="smd-option active" data-type="3digit">3-Digit (±5%)</button>
+        <button class="smd-option" data-type="4digit">4-Digit (±1%)</button>
+        <button class="smd-option" data-type="eia96">EIA-96 (1%)</button>
+      </div>
+
+      <div class="resistor-display">
+        <div class="smd-chip-body">
+          <div class="smd-chip-text" id="smdChipText">473</div>
+        </div>
+        <div class="readout" id="smdReadout">47kΩ</div>
+      </div>
+
+      <div class="smd-columns" id="smdColumns"></div>
+    </div>
+  </main>
+
+  <script>
+    // ==================== PAGE SWITCHING ====================
+    const tabs = document.querySelectorAll('.top-bar .tab');
+    const pages = document.querySelectorAll('.page');
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        tabs.forEach((t) => t.classList.remove('active'));
+        tab.classList.add('active');
+        pages.forEach((page) => {
+          page.classList.toggle('active', page.id === tab.dataset.page);
+        });
+      });
+    });
+
+    // ==================== RCC LOGIC ENGINE ====================
+    const RCC_COLORS = {
+      black:  { hex: '#000000', text: '#ffffff', digit: 0,   mult: 1,           multLabel: 'x1',    tol: null },
+      brown:  { hex: '#8B4513', text: '#ffffff', digit: 1,   mult: 10,          multLabel: 'x10',   tol: 1 },
+      red:    { hex: '#E53935', text: '#ffffff', digit: 2,   mult: 100,         multLabel: 'x100',  tol: 2 },
+      orange: { hex: '#FB8C00', text: '#000000', digit: 3,   mult: 1000,        multLabel: 'x1k',   tol: null },
+      yellow: { hex: '#FDD835', text: '#000000', digit: 4,   mult: 10000,       multLabel: 'x10k',  tol: null },
+      green:  { hex: '#2E7D32', text: '#ffffff', digit: 5,   mult: 100000,      multLabel: 'x100k', tol: 0.5 },
+      blue:   { hex: '#1E88E5', text: '#ffffff', digit: 6,   mult: 1000000,     multLabel: 'x1M',   tol: 0.25 },
+      violet: { hex: '#8E24AA', text: '#ffffff', digit: 7,   mult: 10000000,    multLabel: 'x10M',  tol: 0.1 },
+      grey:   { hex: '#9E9E9E', text: '#000000', digit: 8,   mult: 100000000,   multLabel: 'x100M', tol: 0.05 },
+      white:  { hex: '#F5F5F5', text: '#000000', digit: 9,   mult: 1000000000,  multLabel: 'x1G',   tol: null },
+      gold:   { hex: '#D4AF37', text: '#000000', digit: null, mult: 0.1,        multLabel: 'x0.1',  tol: 5 },
+      silver: { hex: '#B0BEC5', text: '#000000', digit: null, mult: 0.01,       multLabel: 'x0.01', tol: 10 },
+      none:   { hex: '#DCC69E', text: '#000000', digit: null, mult: null,       multLabel: '—',     tol: 20 }
+    };
+
+    const DIGIT_ORDER = ['black', 'brown', 'red', 'orange', 'yellow', 'green', 'blue', 'violet', 'grey', 'white'];
+    const MULT_ORDER  = ['black', 'brown', 'red', 'orange', 'yellow', 'green', 'blue', 'violet', 'grey', 'white', 'gold', 'silver'];
+    const TOL_ORDER   = ['gold', 'silver', 'brown', 'red', 'green', 'blue', 'violet', 'grey', 'none'];
+
+    let bandCount = 4;
+    let selection = {};
+
+    const readoutEl = document.getElementById('rccReadout');
+    const columnsEl = document.getElementById('bandColumns');
+
+    function getDefaults(count) {
+      if (count === 3) return { 0: 'blue', 1: 'grey', 2: 'brown' };
+      if (count === 5) return { 0: 'blue', 1: 'grey', 2: 'black', 3: 'brown', 4: 'gold' };
+      return { 0: 'blue', 1: 'grey', 2: 'brown', 3: 'gold' };
+    }
+
+    function ordinal(n) {
+      return n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : n + 'th';
+    }
+
+    function getColumns(count) {
+      const digitCount = count === 5 ? 3 : 2;
+      const cols = [];
+      for (let i = 0; i < digitCount; i++) {
+        cols.push({ type: 'digit', band: i, title: ordinal(i + 1) + ' Digit' });
+      }
+      cols.push({ type: 'multiplier', band: digitCount, title: 'Multiplier' });
+      if (count >= 4) {
+        cols.push({ type: 'tolerance', band: digitCount + 1, title: 'Tolerance' });
+      }
+      return cols;
+    }
+
+    function colorLabel(type, key) {
+      const c = RCC_COLORS[key];
+      if (type === 'digit') return c.digit;
+      if (type === 'multiplier') return c.multLabel;
+      return key === 'none' ? '±20%' : '±' + c.tol + '%';
+    }
+
+    function renderColumns() {
+      columnsEl.innerHTML = '';
+      getColumns(bandCount).forEach((col) => {
+        const colEl = document.createElement('div');
+        colEl.className = 'col';
+        colEl.dataset.band = col.band;
+
+        const head = document.createElement('div');
+        head.className = 'col-head';
+        head.textContent = col.title;
+        colEl.appendChild(head);
+
+        const list = document.createElement('div');
+        list.className = 'col-list';
+        const order = col.type === 'digit' ? DIGIT_ORDER : col.type === 'multiplier' ? MULT_ORDER : TOL_ORDER;
+
+        order.forEach((key) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'color-btn';
+          btn.dataset.band = col.band;
+          btn.dataset.color = key;
+          btn.style.background = RCC_COLORS[key].hex;
+          btn.style.color = RCC_COLORS[key].text;
+          btn.textContent = colorLabel(col.type, key);
+          if (selection[col.band] === key) btn.classList.add('selected');
+          list.appendChild(btn);
+        });
+
+        colEl.appendChild(list);
+        columnsEl.appendChild(colEl);
+      });
+    }
+
+    function bandWidth(i) {
+      const digitCount = bandCount === 5 ? 3 : 2;
+      if (i < digitCount) return '16px';
+      if (i === digitCount) return '24px';
+      return '20px';
+    }
+
+    function updateResistor() {
+      document.querySelectorAll('#rcc .r-band').forEach((bandEl) => {
+        const i = Number(bandEl.dataset.band);
+        const color = selection[i];
+        if (i < bandCount && color) {
+          bandEl.style.display = '';
+          bandEl.style.width = bandWidth(i);
+          bandEl.style.background = RCC_COLORS[color].hex;
+        } else {
+          bandEl.style.display = 'none';
+        }
+      });
+    }
+
+    function trim(n) {
+      return String(parseFloat(n.toFixed(4)));
+    }
+
+    function formatValue(ohms) {
+      if (ohms >= 1e9) return trim(ohms / 1e9) + 'GΩ';
+      if (ohms >= 1e6) return trim(ohms / 1e6) + 'MΩ';
+      if (ohms >= 1e3) return trim(ohms / 1e3) + 'kΩ';
+      return trim(ohms) + 'Ω';
+    }
+
+    function updateReadout() {
+      const digitCount = bandCount === 5 ? 3 : 2;
+      let value = 0;
+      for (let i = 0; i < digitCount; i++) {
+        value = value * 10 + RCC_COLORS[selection[i]].digit;
+      }
+      value *= RCC_COLORS[selection[digitCount]].mult;
+
+      let tol = 20;
+      if (bandCount >= 4) tol = RCC_COLORS[selection[digitCount + 1]].tol;
+      if (tol == null) tol = 20;
+
+      readoutEl.textContent = formatValue(value) + ' ±' + tol + '%';
+    }
+
+    document.querySelectorAll('#rcc .band-option').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#rcc .band-option').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        bandCount = Number(btn.dataset.bands);
+        selection = getDefaults(bandCount);
+        renderColumns();
+        updateResistor();
+        updateReadout();
+      });
+    });
+
+    columnsEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.color-btn');
+      if (!btn) return;
+
+      const band = Number(btn.dataset.band);
+      selection[band] = btn.dataset.color;
+
+      columnsEl.querySelectorAll('.col[data-band="' + band + '"] .color-btn')
+        .forEach((b) => b.classList.remove('selected'));
+      btn.classList.add('selected');
+
+      updateResistor();
+      updateReadout();
+    });
+
+    // ==================== SMD CALCULATOR LOGIC ENGINE ====================
+    let smdMode = '3digit';
+    let smdSelection = { 0: '4', 1: '7', 2: '3' };
+
+    const smdChipText = document.getElementById('smdChipText');
+    const smdReadout = document.getElementById('smdReadout');
+    const smdColumnsEl = document.getElementById('smdColumns');
+
+    const SMD_DIGITS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'R'];
+    const SMD_MULTS = ['0', '1', '2', '3', '4', '5', '6', '7', '8'];
+
+    function getSmdDefaults(mode) {
+      if (mode === '3digit') return { 0: '4', 1: '7', 2: '3' };
+      if (mode === '4digit') return { 0: '1', 1: '0', 2: '0', 3: '1' };
+      return { 0: '01', 1: 'A' }; // EIA-96 placeholder setup (Multiplier index, Code index)
+    }
+
+    function renderSmdColumns() {
+      smdColumnsEl.innerHTML = '';
+      
+      let columnsConfig = [];
+      if (smdMode === '3digit') {
+        columnsConfig = [
+          { index: 0, title: '1st Digit', values: SMD_DIGITS },
+          { index: 1, title: '2nd Digit', values: SMD_DIGITS },
+          { index: 2, title: 'Multiplier', values: SMD_MULTS }
+        ];
+      } else if (smdMode === '4digit') {
+        columnsConfig = [
+          { index: 0, title: '1st Digit', values: SMD_DIGITS },
+          { index: 1, title: '2nd Digit', values: SMD_DIGITS },
+          { index: 2, title: '3rd Digit', values: SMD_DIGITS },
+          { index: 3, title: 'Multiplier', values: SMD_MULTS }
+        ];
+      } else {
+        // EIA-96 simplified layout
+        columnsConfig = [
+          { index: 0, title: 'Value Code', values: ['01', '02', '29', '68'] },
+          { index: 1, title: 'Multiplier', values: ['A', 'B', 'C', 'D'] }
+        ];
+      }
+
+      columnsConfig.forEach((col) => {
+        const colEl = document.createElement('div');
+        colEl.className = 'col';
+        colEl.dataset.col = col.index;
+
+        const head = document.createElement('div');
+        head.className = 'col-head';
+        head.textContent = col.title;
+        colEl.appendChild(head);
+
+        const list = document.createElement('div');
+        list.className = 'col-list';
+
+        col.values.forEach((val) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'smd-btn';
+          btn.dataset.col = col.index;
+          btn.dataset.val = val;
+          btn.style.background = '#f2f2f5';
+          btn.style.color = '#333';
+          btn.textContent = val;
+          if (smdSelection[col.index] === val) btn.classList.add('selected');
+          list.appendChild(btn);
+        });
+
+        colEl.appendChild(list);
+        smdColumnsEl.appendChild(colEl);
+      });
+    }
+
+    function updateSmdCalculator() {
+      let codeStr = '';
+      let ohms = 0;
+
+      if (smdMode === '3digit') {
+        const d1 = smdSelection[0] || '0';
+        const d2 = smdSelection[1] || '0';
+        const mult = parseInt(smdSelection[2] || '0');
+        codeStr = d1 + d2 + mult;
+        if (d1 === 'R') {
+          ohms = parseFloat(d2 + '.' + mult);
+        } else if (d2 === 'R') {
+          ohms = parseFloat(d1 + '.' + mult);
+        } else {
+          ohms = parseInt(d1 + d2) * Math.pow(10, mult);
+        }
+      } else if (smdMode === '4digit') {
+        const d1 = smdSelection[0] || '0';
+        const d2 = smdSelection[1] || '0';
+        const d3 = smdSelection[2] || '0';
+        const mult = parseInt(smdSelection[3] || '0');
+        codeStr = d1 + d2 + d3 + mult;
+        ohms = parseInt(d1 + d2 + d3) * Math.pow(10, mult);
+      } else {
+        codeStr = (smdSelection[0] || '01') + (smdSelection[1] || 'A');
+        ohms = 100; // simplified stub calculation for visual demonstration
+      }
+
+      smdChipText.textContent = codeStr;
+      smdReadout.textContent = formatValue(ohms);
+    }
+
+    document.querySelectorAll('.smd-option').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.smd-option').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        smdMode = btn.dataset.type;
+        smdSelection = getSmdDefaults(smdMode);
+        renderSmdColumns();
+        updateSmdCalculator();
+      });
+    });
+
+    smdColumnsEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('.smd-btn');
+      if (!btn) return;
+
+      const colIdx = Number(btn.dataset.col);
+      smdSelection[colIdx] = btn.dataset.val;
+
+      smdColumnsEl.querySelectorAll('.col[data-col="' + colIdx + '"] .smd-btn')
+        .forEach((b) => b.classList.remove('selected'));
+      btn.classList.add('selected');
+
+      updateSmdCalculator();
+    });
+
+    // ==================== INIT ====================
+    selection = getDefaults(bandCount);
+    renderColumns();
+    updateResistor();
+    updateReadout();
+
+    smdSelection = getSmdDefaults(smdMode);
+    renderSmdColumns();
+    updateSmdCalculator();
+  </script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker.js')
+        .then(() => console.log('Service Worker Registered'));
+    });
+  }
+</script>
+
+</body>
+</html>
